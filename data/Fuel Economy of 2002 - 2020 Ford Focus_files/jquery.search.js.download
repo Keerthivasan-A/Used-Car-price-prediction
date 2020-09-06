@@ -1,0 +1,92 @@
+(function ($) {
+
+	$.fn.setup_autocomplete = function () {
+		var search_host = '';
+
+		function split( val ) {
+			return val.split( " " );
+			//return val.split( /,\s*/ );
+		}
+
+		function extractLast( term ) {
+			return split( term ).pop();
+		}
+
+		return this.each(function () {
+			// Don't navigate away from the field on tab when selecting an item.
+			$(this).bind( 'keydown', function(event) {
+				if (event.keyCode === $.ui.keyCode.TAB && $(this).autocomplete("instance").menu.active) {
+					event.preventDefault();
+				}
+			})
+			.autocomplete({
+				minLength: 1,
+				source: function( request, response ) {	
+					$.ajax({
+						// Autocomplete URL.
+						//url: search_host + '/search/collection1/suggest/?wt=json&indent=true&spellcheck=true&spellcheck.q='+ extractLast( request.term  //)+'&spellcheck.count=11&start=0&rows=10&omitHeader=true',
+						url: search_host + '/search/collection1/terms/?wt=json&indent=true&terms.fl=content&terms.prefix='+ extractLast( request.term  )+'&terms.count=11&start=0&rows=10&omitHeader=true',
+						dataType: "jsonp",
+						jsonp: 'json.wrf',
+						type:'GET',
+						contentType: "application/json; charset=utf-8",
+						crossDomain: true,
+						cache: true,
+						data: {term: extractLast( request.term )},
+						success: function(data) {
+							// Check the existence of spellcheck.
+							//if (data.spellcheck && data.spellcheck.suggestions && data.spellcheck.suggestions.length > 1) {
+							if (data.terms && data.terms.content) {//check the existence of terms.content
+								if (response !== null) { 
+									//if (data.spellcheck.suggestions[1].suggestion !== null) {//check the existence of spellcheck
+									if (data.terms.content !== null) {//check if terms.content is null
+										var new_arr = $.grep(data.terms.content, function(name, index){ // create new array with only even array elements from terms.content
+											return (index % 2) == 0;
+										});
+										//response( $.map(data.spellcheck.suggestions[1].suggestion, function(item) {
+										response( $.map(new_arr, function(name) {
+											return {
+												label: name
+											}
+										})); 
+									}
+								}
+							}
+						},	
+					});
+				},
+
+				error: function(response) {
+					alert(response.responsetext);
+				},
+
+				focus: function() {
+					// prevent value inserted on focus
+					return false;
+				},
+
+				select: function(event, ui) {
+					var terms = split(this.value);
+					// remove the current input
+					terms.pop();
+					// add the selected item
+					terms.push(ui.item.value);
+					// add placeholder to get the comma-and-space at the end
+					terms.push("");
+					this.value = terms.join(" "); //can have a comma delimiter
+
+					// If a suggestion was clicked, keep the event from telling BS to close the dropdown.
+					var origEvent = event;
+					while (origEvent.originalEvent !== undefined) {
+						origEvent = origEvent.originalEvent;
+						if (origEvent.type == 'click')
+							event.stopPropagation();
+					}
+
+					return false;
+				},
+			});
+		});
+	};
+
+})(jQuery);
